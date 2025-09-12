@@ -2,13 +2,17 @@ package controller
 
 import (
 	"github.com/rodolfodiazr/go-playbook/event-metrics-service/internal/domain"
-	"github.com/rodolfodiazr/go-playbook/event-metrics-service/internal/repository"
 	"github.com/rodolfodiazr/go-playbook/event-metrics-service/internal/service"
 )
 
-func EventList() (domain.Events, error) {
-	repo := repository.NewEventRepository()
-	service := service.NewEventService(repo)
-	events, err := service.List()
-	return events, err
+type EventController struct {
+	service service.EventAggregatorService
+}
+
+func NewEventController(s service.EventAggregatorService) *EventController {
+	return &EventController{service: s}
+}
+
+func (c *EventController) GetEventsWithMetrics() (domain.Events, error) {
+	return c.service.GetEventsWithMetrics()
 }

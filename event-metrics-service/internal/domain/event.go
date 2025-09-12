@@ -7,25 +7,15 @@ type Event struct {
 	Name      string
 	StartDate time.Time
 	EndDate   time.Time
+	Metric    EventMetric
 }
 
-type Events struct {
-	events []Event
-}
+type Events []Event
 
-func (es *Events) Load() {
-	es.events = append(es.events, []Event{
-		{
-			ID:        "EV001",
-			Name:      "Ice Hockey Event 2025",
-			StartDate: time.Now(),
-			EndDate:   time.Now().AddDate(0, 0, 2),
-		},
-		{
-			ID:        "EV002",
-			Name:      "Soccer Tournamenent 2025",
-			StartDate: time.Now(),
-			EndDate:   time.Now().AddDate(0, 0, 2),
-		},
-	}...)
+func (e Events) IDs() []string {
+	output := []string{}
+	for _, event := range e {
+		output = append(output, event.ID)
+	}
+	return output
 }

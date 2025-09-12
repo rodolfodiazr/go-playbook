@@ -23,6 +23,7 @@ type defaultEventMetricService struct {
 
 func (em *defaultEventMetricService) List(eventID ...string) (domain.EventMetrics, error) {
 	findMetrics := func(job <-chan string, results chan<- domain.EventMetric, wg *sync.WaitGroup) {
+		defer wg.Done()
 		for eventID := range job {
 			metrics, _ := em.metricRepository.Find(eventID)
 			results <- metrics
@@ -51,9 +52,8 @@ func (em *defaultEventMetricService) List(eventID ...string) (domain.EventMetric
 	}()
 
 	metrics := domain.EventMetrics{}
-	for result := range results {
-		metrics.Push(result)
+	for metric := range results {
+		metrics = append(metrics, metric)
 	}
-
 	return metrics, nil
 }

@@ -19,6 +19,6 @@ func NewEventService(repo repository.EventRepository) EventService {
 	}
 }
 
-func (e defaultEventService) List() (domain.Events, error) {
+func (e *defaultEventService) List() (domain.Events, error) {
 	return e.eventsRepository.List()
 }
