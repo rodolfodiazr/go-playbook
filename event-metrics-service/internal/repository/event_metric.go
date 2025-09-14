@@ -16,10 +16,5 @@ func NewEventMetricRepository() EventMetricRepository {
 }
 
 func (em *defaultEventMetricRepository) Find(eventID string) (domain.EventMetric, error) {
-	for _, metric := range seed.EventMetricsData() {
-		if metric.EventID == eventID {
-			return metric, nil
-		}
-	}
-	return domain.EventMetric{}, nil
+	return seed.EVENT_METRICS[eventID], nil
 }

@@ -16,5 +16,5 @@ func NewEventRepository() EventRepository {
 }
 
 func (e *defaultEventRepository) List() (domain.Events, error) {
-	return seed.EventsData(), nil
+	return seed.EVENTS_DATA, nil
 }

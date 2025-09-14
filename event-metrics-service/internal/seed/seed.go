@@ -6,8 +6,8 @@ import (
 	"github.com/rodolfodiazr/go-playbook/event-metrics-service/internal/domain"
 )
 
-func EventsData() domain.Events {
-	return domain.Events{
+var (
+	EVENTS_DATA = domain.Events{
 		{
 			ID:        "EV001",
 			Name:      "Ice Hockey Event 2025",
@@ -21,21 +21,19 @@ func EventsData() domain.Events {
 			EndDate:   time.Now().AddDate(0, 0, 2),
 		},
 	}
-}
 
-func EventMetricsData() domain.EventMetrics {
-	return domain.EventMetrics{
-		{
+	EVENT_METRICS = map[string]domain.EventMetric{
+		"EV001": {
 			EventID:                       "EV001",
 			NumberOfReservations:          10,
 			NumberOfConfirmedReservations: 7,
 			NumberOfCanceledReservations:  3,
 		},
-		{
+		"EV002": {
 			EventID:                       "EV002",
 			NumberOfReservations:          20,
 			NumberOfConfirmedReservations: 20,
 			NumberOfCanceledReservations:  0,
 		},
 	}
-}
+)
