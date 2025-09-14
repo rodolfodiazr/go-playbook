@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	EVENTS_DATA = domain.Events{
+	Events = domain.Events{
 		{
 			ID:        "EV001",
 			Name:      "Ice Hockey Event 2025",
@@ -22,7 +22,7 @@ var (
 		},
 	}
 
-	EVENT_METRICS = map[string]domain.EventMetric{
+	EventMetrics = map[string]domain.EventMetric{
 		"EV001": {
 			EventID:                       "EV001",
 			NumberOfReservations:          10,

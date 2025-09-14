@@ -8,7 +8,11 @@ import (
 )
 
 type EventMetricService interface {
-	List(eventID ...string) (domain.EventMetrics, error)
+	List(eventIDs ...string) (domain.EventMetrics, error)
+}
+
+type defaultEventMetricService struct {
+	metricRepository repository.EventMetricRepository
 }
 
 func NewEventMetricService(repo repository.EventMetricRepository) EventMetricService {
@@ -17,32 +21,40 @@ func NewEventMetricService(repo repository.EventMetricRepository) EventMetricSer
 	}
 }
 
-type defaultEventMetricService struct {
-	metricRepository repository.EventMetricRepository
+type metricWorker struct {
+	repository repository.EventMetricRepository
+	jobs       chan string
+	results    chan domain.EventMetric
+	wg         *sync.WaitGroup
 }
 
-func (em *defaultEventMetricService) List(eventID ...string) (domain.EventMetrics, error) {
-	findMetrics := func(job <-chan string, results chan<- domain.EventMetric, wg *sync.WaitGroup) {
-		defer wg.Done()
-		for eventID := range job {
-			metrics, _ := em.metricRepository.Find(eventID)
-			results <- metrics
-		}
+func (mw *metricWorker) start() {
+	defer mw.wg.Done()
+	for eventID := range mw.jobs {
+		metrics, _ := mw.repository.Find(eventID)
+		mw.results <- metrics
 	}
+}
 
+func (em *defaultEventMetricService) List(eventIDs ...string) (domain.EventMetrics, error) {
 	var wg sync.WaitGroup
+	jobs := make(chan string, len(eventIDs))
+	results := make(chan domain.EventMetric, len(eventIDs))
 
-	jobs := make(chan string, 10)
-	results := make(chan domain.EventMetric, 10)
-
-	numberOfWorkers := 5
-	for i := 1; i <= numberOfWorkers; i++ {
+	workerCount := min(len(eventIDs), 5)
+	for range workerCount {
 		wg.Add(1)
-		go findMetrics(jobs, results, &wg)
+		metricWorker := &metricWorker{
+			repository: em.metricRepository,
+			jobs:       jobs,
+			results:    results,
+			wg:         &wg,
+		}
+		go metricWorker.start()
 	}
 
-	for _, id := range eventID {
-		jobs <- id
+	for _, eventID := range eventIDs {
+		jobs <- eventID
 	}
 	close(jobs)
 
@@ -51,7 +63,7 @@ func (em *defaultEventMetricService) List(eventID ...string) (domain.EventMetric
 		close(results)
 	}()
 
-	metrics := domain.EventMetrics{}
+	var metrics domain.EventMetrics
 	for metric := range results {
 		metrics = append(metrics, metric)
 	}
