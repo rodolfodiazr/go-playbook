@@ -1,6 +1,7 @@
 package service
 
 import (
+	"runtime"
 	"sync"
 
 	"github.com/rodolfodiazr/go-playbook/event-metrics-service/internal/domain"
@@ -23,34 +24,36 @@ func NewEventMetricService(repo repository.EventMetricRepository) EventMetricSer
 
 type metricWorker struct {
 	repository repository.EventMetricRepository
-	jobs       chan string
-	results    chan domain.EventMetric
+	jobs       <-chan string
+	results    chan<- domain.EventMetric
 	wg         *sync.WaitGroup
 }
 
-func (mw *metricWorker) start() {
+func (mw *metricWorker) run() {
 	defer mw.wg.Done()
 	for eventID := range mw.jobs {
-		metrics, _ := mw.repository.Find(eventID)
+		metrics, _ := mw.repository.Find(eventID) // TODO: handle errors later
 		mw.results <- metrics
 	}
 }
 
 func (em *defaultEventMetricService) List(eventIDs ...string) (domain.EventMetrics, error) {
 	var wg sync.WaitGroup
+
 	jobs := make(chan string, len(eventIDs))
 	results := make(chan domain.EventMetric, len(eventIDs))
 
-	workerCount := min(len(eventIDs), 5)
+	workerCount := calculateWorkerCount(len(eventIDs))
+	wg.Add(workerCount)
+
 	for range workerCount {
-		wg.Add(1)
-		metricWorker := &metricWorker{
+		w := &metricWorker{
 			repository: em.metricRepository,
 			jobs:       jobs,
 			results:    results,
 			wg:         &wg,
 		}
-		go metricWorker.start()
+		go w.run()
 	}
 
 	for _, eventID := range eventIDs {
@@ -68,4 +71,12 @@ func (em *defaultEventMetricService) List(eventIDs ...string) (domain.EventMetri
 		metrics = append(metrics, metric)
 	}
 	return metrics, nil
+}
+
+func calculateWorkerCount(jobCount int) int {
+	maxWorkers := runtime.NumCPU() * 2
+	if jobCount < maxWorkers {
+		return jobCount
+	}
+	return maxWorkers
 }

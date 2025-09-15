@@ -16,11 +16,9 @@ func main() {
 	aggregatorService := service.NewEventAggregatorService(eventService, metricService)
 	eventController := controller.NewEventController(aggregatorService)
 
-	fmt.Println("Event List >>>")
 	list, err := eventController.GetEventsWithMetrics()
 	if err != nil {
 		log.Fatalf("error when loading the list of events: %v", err)
 	}
-
-	fmt.Println("Events: ", list)
+	fmt.Printf("Events:\n%v", list)
 }

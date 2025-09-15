@@ -33,13 +33,16 @@ func (s *defaultEventAggregatorService) GetEventsWithMetrics() (domain.Events, e
 		return domain.Events{}, err
 	}
 
-	// Step 3: Aggregate results
+	// Step 3: Build a lookup map for metrics
+	metricByEventID := make(map[string]domain.EventMetric, len(metrics))
+	for _, metric := range metrics {
+		metricByEventID[metric.EventID] = metric
+	}
+
+	// Step 4: Aggregate results
 	for i := range events {
-		for j := range metrics {
-			if events[i].ID == metrics[j].EventID {
-				events[i].Metric = metrics[j]
-				break
-			}
+		if metric, ok := metricByEventID[events[i].ID]; ok {
+			events[i].Metric = metric
 		}
 	}
 	return events, nil
