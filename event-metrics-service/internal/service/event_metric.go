@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"runtime"
 	"sync"
 
@@ -26,13 +27,18 @@ type metricWorker struct {
 	repository repository.EventMetricRepository
 	jobs       <-chan string
 	results    chan<- domain.EventMetric
+	errs       chan<- error
 	wg         *sync.WaitGroup
 }
 
 func (mw *metricWorker) run() {
 	defer mw.wg.Done()
 	for eventID := range mw.jobs {
-		metrics, _ := mw.repository.Find(eventID) // TODO: handle errors later
+		metrics, err := mw.repository.Find(eventID)
+		if err != nil {
+			mw.errs <- err
+			continue
+		}
 		mw.results <- metrics
 	}
 }
@@ -42,6 +48,7 @@ func (em *defaultEventMetricService) List(eventIDs ...string) (domain.EventMetri
 
 	jobs := make(chan string, len(eventIDs))
 	results := make(chan domain.EventMetric, len(eventIDs))
+	errs := make(chan error, len(eventIDs))
 
 	workerCount := calculateWorkerCount(len(eventIDs))
 	wg.Add(workerCount)
@@ -51,6 +58,7 @@ func (em *defaultEventMetricService) List(eventIDs ...string) (domain.EventMetri
 			repository: em.metricRepository,
 			jobs:       jobs,
 			results:    results,
+			errs:       errs,
 			wg:         &wg,
 		}
 		go w.run()
@@ -64,11 +72,21 @@ func (em *defaultEventMetricService) List(eventIDs ...string) (domain.EventMetri
 	go func() {
 		wg.Wait()
 		close(results)
+		close(errs)
 	}()
 
 	var metrics domain.EventMetrics
 	for metric := range results {
 		metrics = append(metrics, metric)
+	}
+
+	var allErrors []error
+	for err := range errs {
+		allErrors = append(allErrors, err)
+	}
+
+	if len(allErrors) > 0 {
+		return metrics, errors.Join(allErrors...)
 	}
 	return metrics, nil
 }
