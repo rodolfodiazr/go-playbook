@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"runtime"
 	"sync"
@@ -10,7 +11,7 @@ import (
 )
 
 type EventMetricService interface {
-	List(eventIDs ...string) (domain.EventMetrics, error)
+	List(ctx context.Context, eventIDs ...string) (domain.EventMetrics, error)
 }
 
 type defaultEventMetricService struct {
@@ -43,7 +44,7 @@ func (mw *metricWorker) run() {
 	}
 }
 
-func (em *defaultEventMetricService) List(eventIDs ...string) (domain.EventMetrics, error) {
+func (em *defaultEventMetricService) List(ctx context.Context, eventIDs ...string) (domain.EventMetrics, error) {
 	var wg sync.WaitGroup
 
 	jobs := make(chan string, len(eventIDs))
@@ -64,10 +65,16 @@ func (em *defaultEventMetricService) List(eventIDs ...string) (domain.EventMetri
 		go w.run()
 	}
 
-	for _, eventID := range eventIDs {
-		jobs <- eventID
-	}
-	close(jobs)
+	go func() {
+		defer close(jobs)
+		for _, eventID := range eventIDs {
+			select {
+			case <-ctx.Done():
+				return
+			case jobs <- eventID:
+			}
+		}
+	}()
 
 	go func() {
 		wg.Wait()

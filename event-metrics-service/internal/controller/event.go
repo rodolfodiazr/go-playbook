@@ -1,6 +1,8 @@
 package controller
 
 import (
+	"context"
+
 	"github.com/rodolfodiazr/go-playbook/event-metrics-service/internal/domain"
 	"github.com/rodolfodiazr/go-playbook/event-metrics-service/internal/service"
 )
@@ -14,5 +16,5 @@ func NewEventController(s service.EventAggregatorService) *EventController {
 }
 
 func (c *EventController) GetEventsWithMetrics() (domain.Events, error) {
-	return c.service.GetEventsWithMetrics()
+	return c.service.GetEventsWithMetrics(context.Background())
 }

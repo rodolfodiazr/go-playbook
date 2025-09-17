@@ -1,11 +1,13 @@
 package service
 
 import (
+	"context"
+
 	"github.com/rodolfodiazr/go-playbook/event-metrics-service/internal/domain"
 )
 
 type EventAggregatorService interface {
-	GetEventsWithMetrics() (domain.Events, error)
+	GetEventsWithMetrics(ctx context.Context) (domain.Events, error)
 }
 
 type defaultEventAggregatorService struct {
@@ -20,7 +22,7 @@ func NewEventAggregatorService(eventService EventService, metricService EventMet
 	}
 }
 
-func (s *defaultEventAggregatorService) GetEventsWithMetrics() (domain.Events, error) {
+func (s *defaultEventAggregatorService) GetEventsWithMetrics(ctx context.Context) (domain.Events, error) {
 	// Step 1: Fetch events
 	events, err := s.eventService.List()
 	if err != nil {
@@ -28,7 +30,7 @@ func (s *defaultEventAggregatorService) GetEventsWithMetrics() (domain.Events, e
 	}
 
 	// Step 2: Fetch metrics concurrently
-	metrics, err := s.metricService.List(events.IDs()...)
+	metrics, err := s.metricService.List(ctx, events.IDs()...)
 	if err != nil {
 		return domain.Events{}, err
 	}
