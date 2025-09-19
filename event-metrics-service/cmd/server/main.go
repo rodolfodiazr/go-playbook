@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/rodolfodiazr/go-playbook/event-metrics-service/internal/controller"
 	"github.com/rodolfodiazr/go-playbook/event-metrics-service/internal/repository"
@@ -16,9 +15,12 @@ func main() {
 	aggregatorService := service.NewEventAggregatorService(eventService, metricService)
 	eventController := controller.NewEventController(aggregatorService)
 
+	fmt.Println("Starting request...")
 	list, err := eventController.GetEventsWithMetrics()
 	if err != nil {
-		log.Fatalf("error when loading the list of events: %v", err)
+		fmt.Println("Received error: ", err)
+	} else {
+		fmt.Println("Received events: ", list)
 	}
-	fmt.Printf("Events:\n%v", list)
+	fmt.Println("Done.")
 }

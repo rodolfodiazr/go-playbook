@@ -32,15 +32,33 @@ type metricWorker struct {
 	wg         *sync.WaitGroup
 }
 
-func (mw *metricWorker) run() {
+func (mw *metricWorker) run(ctx context.Context) {
 	defer mw.wg.Done()
-	for eventID := range mw.jobs {
-		metrics, err := mw.repository.Find(eventID)
-		if err != nil {
-			mw.errs <- err
-			continue
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case eventID, ok := <-mw.jobs:
+			if !ok {
+				return
+			}
+
+			metrics, err := mw.repository.Find(eventID)
+			if err != nil {
+				select {
+				case <-ctx.Done():
+					return
+				case mw.errs <- err:
+				}
+				continue
+			}
+
+			select {
+			case <-ctx.Done():
+				return
+			case mw.results <- metrics:
+			}
 		}
-		mw.results <- metrics
 	}
 }
 
@@ -62,7 +80,7 @@ func (em *defaultEventMetricService) List(ctx context.Context, eventIDs ...strin
 			errs:       errs,
 			wg:         &wg,
 		}
-		go w.run()
+		go w.run(ctx)
 	}
 
 	go func() {
@@ -83,19 +101,26 @@ func (em *defaultEventMetricService) List(ctx context.Context, eventIDs ...strin
 	}()
 
 	var metrics domain.EventMetrics
-	for metric := range results {
-		metrics = append(metrics, metric)
-	}
+	for {
+		select {
+		case <-ctx.Done():
+			return metrics, ctx.Err()
+		case metric, ok := <-results:
+			if !ok {
+				var allErrors []error
+				for err := range errs {
+					allErrors = append(allErrors, err)
+				}
 
-	var allErrors []error
-	for err := range errs {
-		allErrors = append(allErrors, err)
-	}
+				if len(allErrors) > 0 {
+					return metrics, errors.Join(allErrors...)
+				}
+				return metrics, nil
+			}
 
-	if len(allErrors) > 0 {
-		return metrics, errors.Join(allErrors...)
+			metrics = append(metrics, metric)
+		}
 	}
-	return metrics, nil
 }
 
 func calculateWorkerCount(jobCount int) int {
