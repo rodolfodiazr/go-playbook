@@ -24,44 +24,6 @@ func NewEventMetricService(repo repository.EventMetricRepository) EventMetricSer
 	}
 }
 
-type metricWorker struct {
-	repository repository.EventMetricRepository
-	jobs       <-chan string
-	results    chan<- domain.EventMetric
-	errs       chan<- error
-	wg         *sync.WaitGroup
-}
-
-func (mw *metricWorker) run(ctx context.Context) {
-	defer mw.wg.Done()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case eventID, ok := <-mw.jobs:
-			if !ok {
-				return
-			}
-
-			metrics, err := mw.repository.Find(eventID)
-			if err != nil {
-				select {
-				case <-ctx.Done():
-					return
-				case mw.errs <- err:
-				}
-				continue
-			}
-
-			select {
-			case <-ctx.Done():
-				return
-			case mw.results <- metrics:
-			}
-		}
-	}
-}
-
 func (em *defaultEventMetricService) List(ctx context.Context, eventIDs ...string) (domain.EventMetrics, error) {
 	var wg sync.WaitGroup
 
@@ -100,25 +62,43 @@ func (em *defaultEventMetricService) List(ctx context.Context, eventIDs ...strin
 		close(errs)
 	}()
 
-	var metrics domain.EventMetrics
+	return collectResults(ctx, results, errs)
+}
+
+type metricWorker struct {
+	repository repository.EventMetricRepository
+	jobs       <-chan string
+	results    chan<- domain.EventMetric
+	errs       chan<- error
+	wg         *sync.WaitGroup
+}
+
+func (mw *metricWorker) run(ctx context.Context) {
+	defer mw.wg.Done()
 	for {
 		select {
 		case <-ctx.Done():
-			return metrics, ctx.Err()
-		case metric, ok := <-results:
+			return
+		case eventID, ok := <-mw.jobs:
 			if !ok {
-				var allErrors []error
-				for err := range errs {
-					allErrors = append(allErrors, err)
-				}
-
-				if len(allErrors) > 0 {
-					return metrics, errors.Join(allErrors...)
-				}
-				return metrics, nil
+				return
 			}
 
-			metrics = append(metrics, metric)
+			metrics, err := mw.repository.Find(eventID)
+			if err != nil {
+				select {
+				case <-ctx.Done():
+					return
+				case mw.errs <- err:
+				}
+				continue
+			}
+
+			select {
+			case <-ctx.Done():
+				return
+			case mw.results <- metrics:
+			}
 		}
 	}
 }
@@ -129,4 +109,28 @@ func calculateWorkerCount(jobCount int) int {
 		return jobCount
 	}
 	return maxWorkers
+}
+
+func collectResults(ctx context.Context, results <-chan domain.EventMetric, errs <-chan error) (domain.EventMetrics, error) {
+	metrics := make(domain.EventMetrics, 0)
+	allErrors := make([]error, 0)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return metrics, ctx.Err()
+
+		case metric, ok := <-results:
+			if !ok {
+				for err := range errs {
+					allErrors = append(allErrors, err)
+				}
+				if len(allErrors) > 0 {
+					return metrics, errors.Join(allErrors...)
+				}
+				return metrics, nil
+			}
+			metrics = append(metrics, metric)
+		}
+	}
 }
