@@ -15,6 +15,7 @@ func NewEventController(s service.EventAggregatorService) *EventController {
 	return &EventController{service: s}
 }
 
+// GetEventsWithMetrics retrieves a list of events along with their associated metrics.
 func (c *EventController) GetEventsWithMetrics() (domain.Events, error) {
 	return c.service.GetEventsWithMetrics(context.Background())
 }
