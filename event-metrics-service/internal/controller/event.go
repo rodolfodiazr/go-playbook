@@ -7,10 +7,12 @@ import (
 	"github.com/rodolfodiazr/go-playbook/event-metrics-service/internal/service"
 )
 
+// EventController handles requests related to events.
 type EventController struct {
 	service service.EventAggregatorService
 }
 
+// NewEventController creates and returns a new EventController instance.
 func NewEventController(s service.EventAggregatorService) *EventController {
 	return &EventController{service: s}
 }
